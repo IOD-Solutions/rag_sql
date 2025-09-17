@@ -1,0 +1,9 @@
+﻿streamlit
+elasticsearch>=8.11.0
+sentence-transformers
+pdfplumber
+python-docx
+python-pptx
+pandas
+openpyxl
+openai>=1.0.0
