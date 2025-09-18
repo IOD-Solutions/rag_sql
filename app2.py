@@ -5,7 +5,7 @@ import streamlit as st
 # IMPORTANT : utilise rag_core_local (pas Elasticsearch)
 import rag_core_local as rag_core
 
-import urllib.request, zipfile
+import sys,urllib.request, zipfile
 
 def ensure_assets():
     mode = os.getenv("RAG_MODE", "sqlite")
