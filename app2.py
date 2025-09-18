@@ -2,7 +2,8 @@
 import os
 from pathlib import Path
 import streamlit as st
-
+# IMPORTANT : utilise rag_core_local (pas Elasticsearch)
+import rag_core_local as rag_core
 
 import urllib.request, zipfile
 
@@ -27,9 +28,6 @@ def ensure_assets():
             os.remove(tmpzip)
 
 ensure_assets()
-
-# IMPORTANT : utilise rag_core_local (pas Elasticsearch)
-import rag_core_local as rag_core
 
 st.set_page_config(page_title="Super RAG", page_icon="🧠", layout="wide")
 st.title("🧠 Super RAG — Chat (local)")
