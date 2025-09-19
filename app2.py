@@ -5,29 +5,52 @@ import streamlit as st
 # IMPORTANT : utilise rag_core_local (pas Elasticsearch)
 import rag_core_local as rag_core
 
-import sys,urllib.request, zipfile
+import sys,urllib.request, zipfile, ssl, sqlite3, pathlib
+
+def _is_sqlite_db(path):
+    try:
+        with open(path, "rb") as f:
+            if not f.read(16).startswith(b"SQLite format 3"):
+                return False
+        con = sqlite3.connect(path)
+        con.execute("select 1").fetchone()
+        con.close()
+        return True
+    except Exception:
+        return False
 
 def ensure_assets():
     mode = os.getenv("RAG_MODE", "sqlite")
-    if mode == "sqlite":
-        db_path = os.getenv("RAG_DB_PATH", "/tmp/rag.db")
-        url = os.getenv("RAG_DB_URL")
-        if url and not os.path.exists(db_path):
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-            print(f"[preflight] Downloading rag.db -> {db_path}", file=sys.stderr, flush=True)
-            urllib.request.urlretrieve(url, db_path)
-    elif mode == "whoosh":
-        idx_dir = os.getenv("WHOOSH_INDEX_DIR", "/tmp/whoosh_index")
-        url = os.getenv("WHOOSH_INDEX_URL")
-        if url and not os.path.isdir(idx_dir):
-            os.makedirs(idx_dir, exist_ok=True)
-            tmpzip = "/tmp/whoosh_index.zip"
-            print(f"[preflight] Downloading whoosh index", file=sys.stderr, flush=True)
-            urllib.request.urlretrieve(url, tmpzip)
-            with zipfile.ZipFile(tmpzip) as z: z.extractall(idx_dir)
-            os.remove(tmpzip)
+    if mode != "sqlite": 
+        return
+    db_path = os.getenv("RAG_DB_PATH", "/tmp/rag.db")
+    url = os.getenv("RAG_DB_URL")
+    if not url or os.path.exists(db_path):
+        return
 
-ensure_assets()
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    print(f"[preflight] GET {url}", file=sys.stderr, flush=True)
+
+    # ⚠️ UA + Accept aident GitHub Releases
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Streamlit/Render)",
+            "Accept": "application/octet-stream",
+        },
+    )
+    ctx = ssl.create_default_context()
+    try:
+        with urllib.request.urlopen(req, context=ctx) as r, open(db_path, "wb") as f:
+            f.write(r.read())
+    except urllib.error.HTTPError as e:
+        print(f"[preflight] HTTP {e.code} on {e.url}", file=sys.stderr, flush=True)
+        raise
+
+    sz = pathlib.Path(db_path).stat().st_size if pathlib.Path(db_path).exists() else 0
+    print(f"[preflight] Saved {db_path} ({sz} bytes)", file=sys.stderr, flush=True)
+    if not _is_sqlite_db(db_path):
+        raise RuntimeError("rag.db téléchargé mais invalide (pas SQLite). Vérifie l’URL.")
 
 st.set_page_config(page_title="Super RAG", page_icon="🧠", layout="wide")
 st.title("🧠 Super RAG — Chat (local)")
@@ -66,3 +89,4 @@ if st.button("Poser la question") and q.strip():
     st.markdown(answer)
 else:
     st.info("Entre une question puis clique sur **Poser la question**.")
+
